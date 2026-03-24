@@ -3,6 +3,8 @@
 import subprocess
 import shlex
 import sys
+import os
+import threading
 from typing import Tuple, Optional
 
 from config.settings import settings
@@ -19,13 +21,14 @@ DANGEROUS_COMMANDS = [
 ]
 
 
-def execute_command(command: str, timeout: Optional[int] = None) -> Tuple[bool, str]:
+def execute_command(command: str, timeout: Optional[int] = None, background: bool = False) -> Tuple[bool, str]:
     """
     Execute a shell command safely and return its output.
 
     Args:
         command: The shell command to execute
         timeout: Optional timeout in seconds (defaults to settings.SHELL_TIMEOUT)
+        background: If True, run the command in background (non-blocking)
 
     Returns:
         Tuple of (success, output or error message)
@@ -36,6 +39,10 @@ def execute_command(command: str, timeout: Optional[int] = None) -> Tuple[bool, 
     # Check for dangerous commands
     if _is_dangerous_command(command):
         return False, f"Command blocked for safety: {command}"
+
+    # Handle background mode for Windows
+    if background:
+        return _execute_background(command)
 
     try:
         # Execute command
@@ -73,6 +80,63 @@ def execute_command(command: str, timeout: Optional[int] = None) -> Tuple[bool, 
         return False, f"Error executing command: {str(e)}"
     except Exception as e:
         return False, f"Unexpected error: {str(e)}"
+
+
+def _execute_background(command: str) -> Tuple[bool, str]:
+    """
+    Execute a command in background mode (non-blocking).
+
+    Args:
+        command: The shell command to execute
+
+    Returns:
+        Tuple of (success, message)
+    """
+    try:
+        import platform
+        system = platform.system()
+
+        if system == 'Windows':
+            # On Windows, use start /b with cmd.exe
+            # But we need to handle this specially since start /b in subprocess doesn't work well
+            # Use PowerShell Start-Process for background execution
+            cmd = f'powershell -Command "Start-Process -FilePath python -ArgumentList \'-m\',\'http.server\',\'8080\' -WindowStyle Hidden"'
+            # Actually, let's just use a simpler approach with nohup in bash if available
+            if os.environ.get('MSYSTEM') or os.environ.get('TERM'):
+                # We're in Git Bash or similar
+                subprocess.Popen(
+                    command,
+                    shell=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                    start_new_session=True
+                )
+                return True, f"Command started in background: {command}"
+            else:
+                # Try with cmd.exe /c start
+                subprocess.Popen(
+                    f'cmd /c start /b {command}',
+                    shell=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL
+                )
+                return True, f"Command started in background: {command}"
+        else:
+            # On Unix-like systems, use nohup
+            subprocess.Popen(
+                command,
+                shell=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True
+            )
+            return True, f"Command started in background: {command}"
+
+    except Exception as e:
+        return False, f"Failed to start background process: {str(e)}"
 
 
 def execute_command_interactive(command: str) -> Tuple[bool, str]:

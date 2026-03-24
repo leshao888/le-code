@@ -292,7 +292,8 @@ class LeCodeApp:
             elif tool_name == "execute_command":
                 success, result = execute_command(
                     tool_input.get("command", ""),
-                    tool_input.get("timeout")
+                    tool_input.get("timeout"),
+                    tool_input.get("background", False)
                 )
                 return result if success else f"Error: {result}"
 

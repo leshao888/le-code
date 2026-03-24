@@ -75,7 +75,7 @@ GREP_SEARCH_TOOL = {
 # Shell execution tools
 EXECUTE_COMMAND_TOOL = {
     "name": "execute_command",
-    "description": "Execute a shell command and return its output. Useful for running tests, installing packages, etc.",
+    "description": "Execute a shell command and return its output. Useful for running tests, installing packages, starting servers, etc.",
     "input_schema": {
         "type": "object",
         "properties": {
@@ -87,6 +87,11 @@ EXECUTE_COMMAND_TOOL = {
                 "type": "integer",
                 "description": "Optional timeout in seconds. Default: 30.",
                 "default": 30
+            },
+            "background": {
+                "type": "boolean",
+                "description": "If true, run the command in background (non-blocking). Use for servers and long-running processes.",
+                "default": False
             }
         },
         "required": ["command"]
