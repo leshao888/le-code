@@ -1,5 +1,7 @@
 """Output formatting for terminal display."""
 
+import threading
+import time
 from typing import Dict, Any, Optional
 from rich.console import Console
 from rich.syntax import Syntax
@@ -25,6 +27,7 @@ class OutputFormatter:
         self._is_waiting = False
         self._stream_content = []
         self._animation_thread = None
+        self._stop_animation = threading.Event()
 
     def print_message(self, role: str, content: str) -> None:
         """
@@ -187,18 +190,36 @@ class OutputFormatter:
 
     def display_waiting_animation(self) -> None:
         """
-        Display waiting message before AI starts responding.
-        Only shown once, not animated.
+        Display animated spinner before AI starts responding.
+        Shows a rotating spinner animation.
         """
-        self.console.print("[bold yellow]AI is thinking...[/bold yellow] ")
-        self.console.file.flush()
+        self._is_waiting = True
+        self._stop_animation.clear()
+
+        def animate():
+            spinner_chars = ['◐', '◓', '◑', '◒']
+            idx = 0
+            while not self._stop_animation.is_set():
+                self.console.print(f"\r[cyan]{spinner_chars[idx]} AI thinking...  [0m", end='', markup=False)
+                idx = (idx + 1) % len(spinner_chars)
+                time.sleep(0.15)
+            # Clear the line when done
+            self.console.print("\r" + " " * 40 + "\r", end='')
+
+        self._animation_thread = threading.Thread(target=animate, daemon=True)
+        self._animation_thread.start()
 
     def start_streaming(self) -> None:
         """Start streaming output."""
+        # Stop the waiting animation first
+        self._stop_animation.set()
+        if self._animation_thread and self._animation_thread.is_alive():
+            time.sleep(0.05)  # Give it a moment to clear
         self._is_streaming = True
         self._stream_content = []
-        # Clear the "thinking" line and start AI response
-        self.console.print("\r[bold green]AI:[/bold green] ", end='')
+        # Start AI response with a clean line
+        self.console.print()
+        self.console.print("[bold green]▶ AI:[/bold green] ", end='', markup=False)
 
     def end_streaming(self) -> None:
         """End streaming output."""
