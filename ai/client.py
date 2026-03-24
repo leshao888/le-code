@@ -271,7 +271,7 @@ class MiniMaxAIClient:
 
     def _execute_web_search(self, tool_input: Dict[str, Any]) -> str:
         """
-        Execute web search using MiniMax Search API.
+        Execute web search using Bing search.
 
         Args:
             tool_input: Dictionary containing web search parameters
@@ -280,44 +280,64 @@ class MiniMaxAIClient:
             Formatted search results as string
         """
         import requests
-        import json
+        from bs4 import BeautifulSoup
+        from html import unescape
         from urllib.parse import quote
 
         try:
             query = tool_input.get("query", "")
             count = min(tool_input.get("count", 10), 10)
 
-            # Try MiniMax search API
-            url = f"https://api.minimax.chat/api/search?query={quote(query)}&count={count}"
+            # Use Bing search with English results
+            url = f"https://www.bing.com/search?q={quote(query)}&hl=en"
             headers = {
-                "Authorization": f"Bearer {settings.ZHIPUAI_API_KEY}",
-                "Content-Type": "application/json"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept-Language": "en-US,en;q=0.9"
             }
 
             response = requests.get(url, headers=headers, timeout=15)
             response.raise_for_status()
 
-            data = response.json()
-            results = data.get("data", [])
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            results = []
+            for item in soup.select('.b_algo')[:count]:
+                title_elem = item.select_one('h2 a')
+                # Try multiple selectors for snippet
+                snippet_elem = (
+                    item.select_one('.b_paractl') or
+                    item.select_one('.b_caption p') or
+                    item.select_one('.snippet')
+                )
+                if title_elem:
+                    title = unescape(title_elem.get_text(strip=True))
+                    result_url = title_elem.get('href', '')
+                    snippet = ""
+                    if snippet_elem:
+                        snippet_text = snippet_elem.get_text(strip=True)
+                        # Clean up the snippet
+                        snippet = ' '.join(snippet_text.split())[:200]
+                    # Filter out non-HTTP URLs and Chinese sites
+                    if result_url.startswith('http') and 'zhihu.com' not in result_url:
+                        results.append({
+                            'title': title,
+                            'url': result_url,
+                            'snippet': snippet
+                        })
 
             if not results:
                 return "No search results found."
 
             formatted_results = []
             for i, result in enumerate(results, 1):
-                title = result.get("title", "No title")
-                result_url = result.get("url", "No URL")
-                summary = result.get("summary", "No summary")
                 formatted_results.append(
-                    f"{i}. {title}\n   URL: {result_url}\n   Summary: {summary}\n"
+                    f"{i}. {result['title']}\n   URL: {result['url']}\n   {result['snippet']}"
                 )
 
-            return "\n".join(formatted_results)
+            return "\n\n".join(formatted_results)
 
         except requests.exceptions.RequestException as e:
-            return f"Web search is currently unavailable: {str(e)}. Please try again later or rephrase your question."
-        except json.JSONDecodeError:
-            return "Web search is currently unavailable (invalid response). Please try again later."
+            return f"Web search is currently unavailable: {str(e)}. Please try again later."
         except Exception as e:
             return f"Web search error: {str(e)}"
 
