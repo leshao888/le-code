@@ -112,6 +112,14 @@ class TerminalUI:
         """Display a waiting animation."""
         self.formatter.display_waiting_animation()
 
+    def display_thinking(self, content: str) -> None:
+        """Display AI thinking content."""
+        self.formatter.display_thinking(content)
+
+    def display_status_update(self, status: str) -> None:
+        """Display status update."""
+        self.formatter.display_status_update(status)
+
     def start_streaming(self) -> None:
         """Start streaming output."""
         self.formatter.start_streaming()

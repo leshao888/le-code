@@ -103,7 +103,7 @@ class MiniMaxAIClient:
             tools: Optional list of tool definitions
 
         Yields:
-            Dict with 'content' or 'tool_call' key
+            Dict with 'content', 'thinking', 'tool_call', or 'status' key
         """
         try:
             kwargs = {
@@ -117,10 +117,18 @@ class MiniMaxAIClient:
             if tools:
                 kwargs["tools"] = convert_tools_to_openai_format(tools)
 
+            # Enable MiniMax extended features (thinking, plugins)
+            kwargs["extra_headers"] = {
+                "minimax-extension": '{"plugins": {"search": {"enable": true}}, "thinking": {"type": "extension", "enable": true}}'
+            }
+
             stream = self.client.chat.completions.create(**kwargs)
 
             # Buffer for accumulating tool call data
             tool_call_buffer = {}
+            # Buffer for thinking content
+            thinking_buffer = ""
+            in_thinking = False
 
             for chunk in stream:
                 if not chunk.choices:
@@ -129,11 +137,66 @@ class MiniMaxAIClient:
                 delta = chunk.choices[0].delta
                 finish_reason = chunk.choices[0].finish_reason
 
-                # Check for content - filter out thinking tokens
+                # Check for extended data (thinking, plugin info)
+                if hasattr(chunk, 'extensions') and chunk.extensions:
+                    ext = chunk.extensions
+                    # Check for thinking content
+                    if 'thinking' in ext:
+                        thinking_content = ext['thinking']
+                        if isinstance(thinking_content, str) and thinking_content:
+                            thinking_buffer += thinking_content
+                            yield {"type": "thinking", "content": thinking_content}
+                    # Check for plugin status
+                    if 'plugins' in ext:
+                        plugin_info = ext['plugins']
+                        if isinstance(plugin_info, dict):
+                            status = plugin_info.get('status', '')
+                            if status:
+                                yield {"type": "status", "content": status}
+
+                # Check for content
                 if delta.content:
                     content = delta.content
-                    # Filter out thinking tokens
-                    if content.strip() not in ["</think>", "<think>"]:
+
+                    # Check if this chunk contains thinking markers (MiniMax uses <think> and </think>)
+                    if "</think>" in content:
+                        # End of thinking
+                        parts = content.split("</think>")
+                        for j, part in enumerate(parts):
+                            if j == 0:
+                                # Content before </think>
+                                if part:
+                                    if in_thinking:
+                                        thinking_buffer += part
+                                    else:
+                                        yield {"type": "content", "content": part}
+                            elif part:
+                                # Content after </think> - this is the actual response
+                                if in_thinking and thinking_buffer.strip():
+                                    yield {"type": "thinking", "content": thinking_buffer.strip()}
+                                thinking_buffer = ""
+                                in_thinking = False
+                                if part.strip():
+                                    yield {"type": "content", "content": part}
+                    elif "<think>" in content:
+                        # Start of thinking
+                        parts = content.split("<think>")
+                        for j, part in enumerate(parts):
+                            if j == 0:
+                                # Content before <think>
+                                if part.strip():
+                                    if in_thinking:
+                                        thinking_buffer += part
+                                    else:
+                                        yield {"type": "content", "content": part}
+                            elif part:
+                                # Content after <think> - this is thinking
+                                in_thinking = True
+                                thinking_buffer += part
+                    elif in_thinking:
+                        # Continue thinking
+                        thinking_buffer += content
+                    else:
                         yield {"type": "content", "content": content}
 
                 # Check for tool calls
@@ -153,22 +216,27 @@ class MiniMaxAIClient:
                         if tool_call.function and tool_call.function.arguments:
                             tool_call_buffer[index]["arguments"] += tool_call.function.arguments
 
-                # Check if this is the final chunk - yield any remaining tool calls
+                # Check if this is the final chunk - yield any remaining tool calls or thinking
                 if finish_reason in ["tool_calls", "stop", "length"]:
+                    # Yield any remaining thinking content
+                    if thinking_buffer.strip():
+                        yield {"type": "thinking", "content": thinking_buffer.strip()}
+                        thinking_buffer = ""
                     if tool_call_buffer:
                         for index in sorted(tool_call_buffer.keys()):
                             yield {"type": "tool_call", "tool_call": tool_call_buffer[index]}
                         tool_call_buffer = {}
 
         except RateLimitError as e:
-            print(f"\n[Rate limit exceeded. Please wait: {e}]")
+            print(f"[Rate limit exceeded. Please wait: {e}]")
             raise
         except APIConnectionError as e:
-            print(f"\n[Connection error: {e}]")
+            print(f"[Connection error: {e}]")
             raise
         except APIError as e:
-            print(f"\n[API error: {e}]")
+            print(f"[API error: {e}]")
             raise
+
 
     def create_message_stream(
         self,

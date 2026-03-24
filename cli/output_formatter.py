@@ -209,6 +209,30 @@ class OutputFormatter:
         self._animation_thread = threading.Thread(target=animate, daemon=True)
         self._animation_thread.start()
 
+    def display_thinking(self, content: str) -> None:
+        """
+        Display AI thinking/thought process.
+
+        Args:
+            content: Thinking content to display
+        """
+        # Stop the waiting animation first
+        self._stop_animation.set()
+        if self._animation_thread and self._animation_thread.is_alive():
+            time.sleep(0.05)
+
+        # Print thinking content with special formatting
+        self.console.print(f"\r[dim magenta]💭 Thinking: {content}[0m", end='', markup=False)
+
+    def display_status_update(self, status: str) -> None:
+        """
+        Display status update (e.g., "searching...", "browsing...").
+
+        Args:
+            status: Status message to display
+        """
+        self.console.print(f"\r[dim yellow]⚡ {status}[0m", end='', markup=False)
+
     def start_streaming(self) -> None:
         """Start streaming output."""
         # Stop the waiting animation first

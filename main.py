@@ -140,7 +140,9 @@ class LeCodeApp:
         try:
             # Collect content for memory
             full_content = []
+            thinking_content = []
             tool_calls = []
+            is_first_content = True
 
             # Start streaming - this clears the "thinking" message
             self.ui.start_streaming()
@@ -148,7 +150,20 @@ class LeCodeApp:
             for event in generator:
                 event_type = event.get("type")
 
-                if event_type == "content":
+                if event_type == "thinking":
+                    # Display thinking content with special formatting
+                    thinking_text = event.get("content", "")
+                    if thinking_text:
+                        thinking_content.append(thinking_text)
+                        self.ui.display_thinking(thinking_text)
+
+                elif event_type == "status":
+                    # Display status messages (e.g., "searching...")
+                    status_text = event.get("content", "")
+                    if status_text:
+                        self.ui.display_status_update(status_text)
+
+                elif event_type == "content":
                     chunk = event.get("content", "")
                     if chunk:
                         full_content.append(chunk)
