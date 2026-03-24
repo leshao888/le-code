@@ -48,10 +48,14 @@ class LeCodeApp:
             "2. 生成、修改和调试代码"
             "3. 读取、写入和编辑文件"
             "4. 执行 shell 命令"
-            "5. 搜索代码和文件"
+            "5. 搜索网络获取最新信息"
+            ""
+            "当你调用 web_search 工具后，会返回搜索结果。你必须："
+            "- 仔细阅读搜索结果"
+            "- 将结果整合到你的回答中"
+            "- 不要重复调用相同的工具"
             ""
             "请使用清晰、简洁的语言回答。"
-            "当需要执行操作时，会自动调用相应的工具。"
         )
 
     def run(self) -> None:
@@ -343,16 +347,10 @@ class LeCodeApp:
             except:
                 arguments = {}
 
-            # Add tool result message with correct OpenAI format
+            # Add tool result as plain text message (more compatible)
             messages.append({
                 "role": "user",
-                "content": [
-                    {
-                        "type": "tool_result",
-                        "tool_call_id": tool_call.get("id"),
-                        "content": tool_result
-                    }
-                ]
+                "content": f"以下是搜索结果，请基于这些信息回答用户的问题：\n\n{tool_result}"
             })
 
             # Display waiting indicator
