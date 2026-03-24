@@ -3,3 +3,4 @@ openai>=1.0.0              # OpenAI SDK (for MiniMax compatibility)
 prompt-toolkit>=3.0.0      # Terminal interaction
 python-dotenv>=1.0.0        # Environment variable management
 rich>=13.0.0              # Terminal beautiful output
+ddgs>=5.0.0                 # Real-time web search (DuckDuckGo)
