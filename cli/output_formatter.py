@@ -214,7 +214,8 @@ class OutputFormatter:
             chunk: Text chunk to display
         """
         if self._is_streaming and chunk:
-            self.console.print(chunk, end='')
+            # Use markup=False to prevent Rich from interpreting content as markup
+            self.console.print(chunk, end='', markup=False)
             self._stream_content.append(chunk)
 
     def print_command_output(self, command: str, output: str, exit_code: int) -> None:

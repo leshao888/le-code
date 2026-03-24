@@ -186,11 +186,6 @@ class LeCodeApp:
                         "input": tool_input,
                         "result": result,
                     }
-                    self.memory.add_message(
-                        "assistant",
-                        f"[Tool: {tool_name}]",
-                        tool_call=tool_result
-                    )
 
                     # Send tool result back to AI and get follow-up response
                     self._get_followup_with_tool_result(tool_call, result)
@@ -348,13 +343,13 @@ class LeCodeApp:
             except:
                 arguments = {}
 
-            # Add tool result message
+            # Add tool result message with correct OpenAI format
             messages.append({
                 "role": "user",
                 "content": [
                     {
                         "type": "tool_result",
-                        "tool_use_id": tool_call.get("id"),
+                        "tool_call_id": tool_call.get("id"),
                         "content": tool_result
                     }
                 ]
@@ -363,10 +358,9 @@ class LeCodeApp:
             # Display waiting indicator
             self.ui.display_waiting_animation()
 
-            # Get follow-up response
+            # Get follow-up response without tools to prevent further tool calls
             response = self.ai_client.create_message(
                 messages=messages,
-                tools=ALL_TOOLS,
                 stream=True
             )
 

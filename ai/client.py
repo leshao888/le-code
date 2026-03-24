@@ -127,10 +127,14 @@ class MiniMaxAIClient:
                     continue
 
                 delta = chunk.choices[0].delta
+                finish_reason = chunk.choices[0].finish_reason
 
-                # Check for content
+                # Check for content - filter out thinking tokens
                 if delta.content:
-                    yield {"type": "content", "content": delta.content}
+                    content = delta.content
+                    # Filter out thinking tokens
+                    if content.strip() not in ["</think>", "<think>"]:
+                        yield {"type": "content", "content": content}
 
                 # Check for tool calls
                 if delta.tool_calls:
@@ -149,17 +153,9 @@ class MiniMaxAIClient:
                         if tool_call.function and tool_call.function.arguments:
                             tool_call_buffer[index]["arguments"] += tool_call.function.arguments
 
-                # Check if this is the final chunk for tool calls
-                if chunk.choices[0].finish_reason == "tool_calls":
-                    # Yield all accumulated tool calls
-                    for index in sorted(tool_call_buffer.keys()):
-                        yield {"type": "tool_call", "tool_call": tool_call_buffer[index]}
-                    tool_call_buffer = {}
-
-                # Check if this is the final chunk for content
-                if chunk.choices[0].finish_reason in ["stop", "length"]:
+                # Check if this is the final chunk - yield any remaining tool calls
+                if finish_reason in ["tool_calls", "stop", "length"]:
                     if tool_call_buffer:
-                        # There were tool calls but no explicit tool_calls finish reason
                         for index in sorted(tool_call_buffer.keys()):
                             yield {"type": "tool_call", "tool_call": tool_call_buffer[index]}
                         tool_call_buffer = {}
@@ -282,7 +278,9 @@ class MiniMaxAIClient:
         import requests
         from bs4 import BeautifulSoup
         from html import unescape
-        from urllib.parse import quote
+        from urllib.parse import quote, parse_qs, urlparse, unquote
+        import base64
+        import re
         import time
 
         # Chinese domains to exclude (due to geo-targeting returning Chinese results)
@@ -293,12 +291,42 @@ class MiniMaxAIClient:
             'toutiao.com', 'weibo.com', 'weixin.qq', 'alipay.com'
         ]
 
-        # English domains to prioritize
-        english_domains = [
-            '.com', '.org', '.net', '.io', '.co', '.tech', '.ai', '.dev',
-            'stackoverflow.com', 'github.com', 'reddit.com', 'medium.com',
-            'dev.to', 'python.org', 'npmjs.com', 'pypi.org'
-        ]
+        def decode_bing_redirect(url):
+            """Decode Bing redirect URL to get actual destination."""
+            if 'ck/a' in url:
+                try:
+                    # Extract u parameter - base64 chars are A-Za-z0-9+/
+                    match = re.search(r'[?&]u=([A-Za-z0-9+/]+)', url)
+                    if match:
+                        encoded_url = match.group(1)
+                        # The Bing redirect URL has a prefix like 'a1' that are raw bytes
+                        # not valid UTF-8, so we need to decode as bytes first
+                        try:
+                            # Try direct decode first
+                            padding_needed = (4 - len(encoded_url) % 4) % 4
+                            padded = encoded_url + '=' * padding_needed
+                            actual_bytes = base64.b64decode(padded, validate=False)
+                            # Check if it starts with http after filtering non-printable prefix
+                            actual = actual_bytes.decode('utf-8', errors='ignore')
+                            if actual.startswith('http'):
+                                return actual
+                        except:
+                            pass
+
+                        # Try skipping the first 2 bytes (common prefix issue)
+                        try:
+                            encoded_skip = encoded_url[2:]
+                            padding_needed = (4 - len(encoded_skip) % 4) % 4
+                            padded = encoded_skip + '=' * padding_needed
+                            actual_bytes = base64.b64decode(padded, validate=False)
+                            if actual_bytes.startswith(b'http'):
+                                return actual_bytes.decode('utf-8', errors='ignore')
+                        except:
+                            pass
+
+                except Exception:
+                    pass
+            return None
 
         try:
             query = tool_input.get("query", "")
@@ -319,8 +347,8 @@ class MiniMaxAIClient:
                     break
 
                 try:
-                    # Direct Bing search
-                    url = f"https://www.bing.com/search?q={quote(query)}"
+                    # Direct Bing search - use setlang=en to get English results
+                    url = f"https://www.bing.com/search?q={quote(query)}&setlang=en-US&mkt=en-US"
                     response = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
                     response.raise_for_status()
 
@@ -342,10 +370,18 @@ class MiniMaxAIClient:
                                 snippet_text = snippet_elem.get_text(strip=True)
                                 snippet = ' '.join(snippet_text.split())[:200]
 
+                            # Handle Bing redirect URLs
+                            decoded_url = decode_bing_redirect(result_url)
+                            if decoded_url:
+                                result_url = decoded_url
+
                             # Check if URL should be excluded
                             should_exclude = any(domain in result_url.lower() for domain in exclude_domains)
 
-                            if result_url.startswith('http') and not should_exclude:
+                            # Skip URLs that don't look like valid web URLs
+                            is_valid_url = result_url.startswith('http://') or result_url.startswith('https://')
+
+                            if is_valid_url and not should_exclude:
                                 # Avoid duplicates
                                 if not any(r['url'] == result_url for r in all_results):
                                     all_results.append({
@@ -354,15 +390,9 @@ class MiniMaxAIClient:
                                         'snippet': snippet
                                     })
 
-                    # If we got English results (from expected domains), stop retrying
-                    if all_results:
-                        # Check if results look English (have recognizable domains)
-                        has_english = any(
-                            any(domain in r['url'].lower() for domain in english_domains)
-                            for r in all_results
-                        )
-                        if has_english or attempt >= max_retries - 1:
-                            break
+                    # If we got results, stop retrying
+                    if all_results or attempt >= max_retries - 1:
+                        break
                     else:
                         time.sleep(0.5)  # Wait before retry
 
