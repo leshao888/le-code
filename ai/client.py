@@ -271,7 +271,7 @@ class MiniMaxAIClient:
 
     def _execute_web_search(self, tool_input: Dict[str, Any]) -> str:
         """
-        Execute web search using Bing search.
+        Execute web search using Bing search with multiple fallback methods.
 
         Args:
             tool_input: Dictionary containing web search parameters
@@ -283,53 +283,100 @@ class MiniMaxAIClient:
         from bs4 import BeautifulSoup
         from html import unescape
         from urllib.parse import quote
+        import time
+
+        # Chinese domains to exclude (due to geo-targeting returning Chinese results)
+        exclude_domains = [
+            'zhihu.com', '.cn', 'baidu.com', 'qq.com', 'sina.com', 'sohu.com',
+            '163.com', 'ifeng.com', 'liaoxuefeng.com', 'runoob.com', 'cnpython.com',
+            'csdn.net', 'juejin.cn', 'segmentfault.com', 'bilibili.com', 'jianshu.com',
+            'toutiao.com', 'weibo.com', 'weixin.qq', 'alipay.com'
+        ]
+
+        # English domains to prioritize
+        english_domains = [
+            '.com', '.org', '.net', '.io', '.co', '.tech', '.ai', '.dev',
+            'stackoverflow.com', 'github.com', 'reddit.com', 'medium.com',
+            'dev.to', 'python.org', 'npmjs.com', 'pypi.org'
+        ]
 
         try:
             query = tool_input.get("query", "")
             count = min(tool_input.get("count", 10), 10)
 
-            # Use Bing search with English results
-            url = f"https://www.bing.com/search?q={quote(query)}&hl=en"
             headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept-Language": "en-US,en;q=0.9"
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             }
 
-            response = requests.get(url, headers=headers, timeout=15)
-            response.raise_for_status()
+            # Try direct Bing search with retries
+            max_retries = 3
+            all_results = []
 
-            soup = BeautifulSoup(response.text, 'html.parser')
+            for attempt in range(max_retries):
+                if len(all_results) >= count:
+                    break
 
-            results = []
-            for item in soup.select('.b_algo')[:count]:
-                title_elem = item.select_one('h2 a')
-                # Try multiple selectors for snippet
-                snippet_elem = (
-                    item.select_one('.b_paractl') or
-                    item.select_one('.b_caption p') or
-                    item.select_one('.snippet')
-                )
-                if title_elem:
-                    title = unescape(title_elem.get_text(strip=True))
-                    result_url = title_elem.get('href', '')
-                    snippet = ""
-                    if snippet_elem:
-                        snippet_text = snippet_elem.get_text(strip=True)
-                        # Clean up the snippet
-                        snippet = ' '.join(snippet_text.split())[:200]
-                    # Filter out non-HTTP URLs and Chinese sites
-                    if result_url.startswith('http') and 'zhihu.com' not in result_url:
-                        results.append({
-                            'title': title,
-                            'url': result_url,
-                            'snippet': snippet
-                        })
+                try:
+                    # Direct Bing search
+                    url = f"https://www.bing.com/search?q={quote(query)}"
+                    response = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
+                    response.raise_for_status()
 
-            if not results:
-                return "No search results found."
+                    soup = BeautifulSoup(response.text, 'html.parser')
 
+                    # Parse Bing results
+                    for item in soup.select('.b_algo')[:count * 2]:
+                        title_elem = item.select_one('h2 a')
+                        snippet_elem = (
+                            item.select_one('.b_paractl') or
+                            item.select_one('.b_caption p') or
+                            item.select_one('.snippet')
+                        )
+                        if title_elem:
+                            title = unescape(title_elem.get_text(strip=True))
+                            result_url = title_elem.get('href', '')
+                            snippet = ""
+                            if snippet_elem:
+                                snippet_text = snippet_elem.get_text(strip=True)
+                                snippet = ' '.join(snippet_text.split())[:200]
+
+                            # Check if URL should be excluded
+                            should_exclude = any(domain in result_url.lower() for domain in exclude_domains)
+
+                            if result_url.startswith('http') and not should_exclude:
+                                # Avoid duplicates
+                                if not any(r['url'] == result_url for r in all_results):
+                                    all_results.append({
+                                        'title': title,
+                                        'url': result_url,
+                                        'snippet': snippet
+                                    })
+
+                    # If we got English results (from expected domains), stop retrying
+                    if all_results:
+                        # Check if results look English (have recognizable domains)
+                        has_english = any(
+                            any(domain in r['url'].lower() for domain in english_domains)
+                            for r in all_results
+                        )
+                        if has_english or attempt >= max_retries - 1:
+                            break
+                    else:
+                        time.sleep(0.5)  # Wait before retry
+
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        time.sleep(0.5)
+                    continue
+
+            if not all_results:
+                return "No search results found. The search may be unavailable due to network restrictions."
+
+            # Format and return results
             formatted_results = []
-            for i, result in enumerate(results, 1):
+            for i, result in enumerate(all_results[:count], 1):
                 formatted_results.append(
                     f"{i}. {result['title']}\n   URL: {result['url']}\n   {result['snippet']}"
                 )
