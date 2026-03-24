@@ -1,0 +1,107 @@
+================================================================================
+                    le-code - Terminal AI Programming Assistant
+================================================================================
+
+[STATUS] Setup Complete!
+-----------------------
+✅ API Key configured: 10bf8cdc9d1644d3b005...TD7Y
+✅ Dependencies installed
+✅ API Connection tested and working
+✅ Program ready to use
+
+--------------------------------------------------------------------------------
+                            HOW TO START
+--------------------------------------------------------------------------------
+
+You have THREE options to start the program:
+
+
+OPTION 1: Double-click the batch file (EASIEST)
+------------------------------------------------
+Simply double-click this file in File Explorer:
+   > start_lecode.bat
+
+This will open a new terminal window and run the program automatically.
+
+
+OPTION 2: Using Command Prompt (CMD)
+------------------------------------
+1. Press Win + R on your keyboard
+2. Type "cmd" and press Enter
+3. Type the following commands:
+
+   cd E:\AIProject\le-code\le-code
+   python main.py
+
+
+OPTION 3: Using PowerShell
+--------------------------
+1. Right-click the Start button
+2. Select "Windows PowerShell"
+3. Type the following commands:
+
+   cd E:\AIProject\le-code\le-code
+   python main.py
+
+
+--------------------------------------------------------------------------------
+                          AVAILABLE COMMANDS
+--------------------------------------------------------------------------------
+
+Command        Description
+-------        -----------
+/help          Display help information
+/clear         Clear conversation history
+/exit          Exit the program
+/sessions      List all saved sessions
+/save          Save current session
+/load <id>    Load a specific session
+/model         Display current model information
+/context       Display conversation context
+
+
+--------------------------------------------------------------------------------
+                            EXAMPLE USAGE
+--------------------------------------------------------------------------------
+
+> 你好，请介绍一下你自己
+> 帮我创建一个 Python 文件 hello.py
+> 读取 hello.py 的内容
+> 在文件中添加一个计算斐波那契数列的函数
+> 执行 hello.py 文件
+> 搜索所有的 .py 文件
+
+
+--------------------------------------------------------------------------------
+                        CODING PLAN INFORMATION
+--------------------------------------------------------------------------------
+
+You are using: GLM Coding Plan (if subscribed)
+Base URL: https://open.bigmodel.cn/api/anthropic
+Model: glm-4.7
+
+To subscribe to Coding Plan for discounted rates:
+   Visit: https://bigmodel.cn/glm-coding
+
+
+--------------------------------------------------------------------------------
+                              TROUBLESHOOTING
+--------------------------------------------------------------------------------
+
+Problem: API connection failed
+Solution: Check your API key and internet connection
+
+Problem: Program won't start
+Solution: Make sure Python 3.9+ is installed
+
+Problem: Chinese characters display incorrectly
+Solution: This is a terminal encoding issue. The program still works correctly.
+
+
+--------------------------------------------------------------------------------
+Need help?
+   - Read README.md for detailed documentation
+   - Check test_connection.py for API testing
+   - Visit: https://docs.bigmodel.cn/cn/api/introduction
+
+================================================================================
