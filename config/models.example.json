@@ -1,0 +1,19 @@
+{
+    "_comment": "Add custom model configurations here to override or extend defaults",
+    "_comment2": "The model name must match the model in config.json",
+    "_comment3": "Supported api_type: 'openai' or 'anthropic'",
+    "_comment4": "Supported thinking_parser: 'minimax_claude' or 'no_thinking'",
+    "_comment5": "All fields are required unless marked optional",
+
+    "my-custom-model": {
+        "provider": "custom",
+        "base_url": "https://custom-api.example.com/v1",
+        "api_type": "openai",
+        "supports_thinking": true,
+        "thinking_parser": "minimax_claude",
+        "supports_tools": true,
+        "supports_streaming": true,
+        "context_window": 8000,
+        "description": "My Custom Model"
+    }
+}

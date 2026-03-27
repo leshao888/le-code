@@ -1,7 +1,6 @@
 {
     "api_key": "YOUR_API_KEY_HERE",
-    "base_url": "https://api.minimax.chat",
-    "model_name": "MiniMax-Text-01",
+    "model": "MiniMax-M2.7",
     "max_tokens": 8192,
-    "temperature": 0.6
+    "temperature": 1.0
 }

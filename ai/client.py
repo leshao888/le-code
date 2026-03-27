@@ -1,12 +1,12 @@
-"""AI client using MiniMax API (via OpenAI SDK)."""
+"""AI client with pluggable model support."""
 
-import os
 import time
-from typing import List, Dict, Any, Optional, Iterator, Union
-import openai
+from typing import List, Dict, Any, Optional, Iterator
+
 from openai import OpenAI, APIError, APIConnectionError, RateLimitError
 
 from config.settings import settings
+from config.models import ModelRegistry, ModelConfig
 
 
 def convert_tools_to_openai_format(tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -33,18 +33,54 @@ def convert_tools_to_openai_format(tools: List[Dict[str, Any]]) -> List[Dict[str
     return openai_tools
 
 
-class MiniMaxAIClient:
-    """MiniMax client wrapper using OpenAI SDK."""
+class AIClient:
+    """Generic AI client with model configuration support."""
 
-    def __init__(self):
-        """Initialize the MiniMax client."""
-        self.client = OpenAI(
-            api_key=settings.API_KEY,
-            base_url=settings.BASE_URL,
-            timeout=60.0,
-            max_retries=3
-        )
-        self.model = settings.MODEL_NAME
+    def __init__(self, model_name: Optional[str] = None):
+        """
+        Initialize the AI client.
+
+        Args:
+            model_name: Optional model name to use. If None, uses the default from settings.
+        """
+        # Get model configuration from registry
+        if model_name:
+            ModelRegistry.set_current_model(model_name)
+
+        self.model_config = ModelRegistry.get_current_model()
+        if not self.model_config:
+            raise ValueError(f"Model '{model_name or settings.MODEL}' not found in registry")
+
+        # Initialize the appropriate client based on api_type
+        self._init_client()
+
+    def _init_client(self) -> None:
+        """Initialize the HTTP client based on model configuration."""
+        base_url = self.model_config.get("base_url", "")
+        api_key = settings.API_KEY
+
+        if self.model_config.get("api_type") == "anthropic":
+            # For Anthropic-compatible APIs (like Zhipu GLM)
+            # Use OpenAI SDK with Anthropic-compatible endpoint
+            self.client = OpenAI(
+                api_key=api_key,
+                base_url=base_url,
+                timeout=60.0,
+                max_retries=3
+            )
+        else:
+            # For OpenAI-compatible APIs
+            self.client = OpenAI(
+                api_key=api_key,
+                base_url=base_url,
+                timeout=60.0,
+                max_retries=3
+            )
+
+    @property
+    def model_name(self) -> str:
+        """Get the current model name."""
+        return ModelRegistry.get_current_model_name()
 
     def create_message(
         self,
@@ -65,16 +101,16 @@ class MiniMaxAIClient:
         """
         try:
             kwargs = {
-                "model": self.model,
+                "model": self.model_name,
                 "max_tokens": settings.MAX_TOKENS,
                 "messages": messages,
                 "temperature": settings.TEMPERATURE,
             }
 
-            if tools:
+            if tools and self.model_config.get("supports_tools", True):
                 kwargs["tools"] = convert_tools_to_openai_format(tools)
 
-            if stream:
+            if stream and self.model_config.get("supports_streaming", True):
                 return {"stream": True, "generator": self._create_message_stream(messages, tools)}
             else:
                 response = self.client.chat.completions.create(**kwargs)
@@ -103,132 +139,30 @@ class MiniMaxAIClient:
             tools: Optional list of tool definitions
 
         Yields:
-            Dict with 'content', 'thinking', 'tool_call', or 'status' key
+            Event dictionaries with 'type' and 'content' keys
         """
         try:
             kwargs = {
-                "model": self.model,
+                "model": self.model_name,
                 "max_tokens": settings.MAX_TOKENS,
                 "messages": messages,
                 "temperature": settings.TEMPERATURE,
                 "stream": True
             }
 
-            if tools:
+            if tools and self.model_config.get("supports_tools", True):
                 kwargs["tools"] = convert_tools_to_openai_format(tools)
-
-            # Enable MiniMax extended features (thinking, plugins)
-            kwargs["extra_headers"] = {
-                "minimax-extension": '{"plugins": {"search": {"enable": true}}, "thinking": {"type": "extension", "enable": true}}'
-            }
 
             stream = self.client.chat.completions.create(**kwargs)
 
-            # Buffer for accumulating tool call data
-            tool_call_buffer = {}
-            # Buffer for thinking content
-            thinking_buffer = ""
-            in_thinking = False
+            # Check if model supports thinking
+            supports_thinking = self.model_config.get("supports_thinking", False)
+            thinking_parser = self.model_config.get("thinking_parser", "no_thinking")
 
-            for chunk in stream:
-                if not chunk.choices:
-                    continue
-
-                delta = chunk.choices[0].delta
-                finish_reason = chunk.choices[0].finish_reason
-
-                # Check for extended data (thinking, plugin info)
-                if hasattr(chunk, 'extensions') and chunk.extensions:
-                    ext = chunk.extensions
-                    # Check for thinking content
-                    if 'thinking' in ext:
-                        thinking_content = ext['thinking']
-                        if isinstance(thinking_content, str) and thinking_content:
-                            thinking_buffer += thinking_content
-                            yield {"type": "thinking", "content": thinking_content}
-                    # Check for plugin status
-                    if 'plugins' in ext:
-                        plugin_info = ext['plugins']
-                        if isinstance(plugin_info, dict):
-                            status = plugin_info.get('status', '')
-                            if status:
-                                yield {"type": "status", "content": status}
-
-                # Check for content
-                if delta.content:
-                    content = delta.content
-
-                    # Check if this chunk contains thinking markers (MiniMax uses <think> and </think>)
-                    if "</think>" in content:
-                        # End of thinking
-                        parts = content.split("</think>")
-                        for j, part in enumerate(parts):
-                            if j == 0:
-                                # Content before </think>
-                                if part:
-                                    if in_thinking:
-                                        thinking_buffer += part
-                                    else:
-                                        yield {"type": "content", "content": part}
-                            elif part:
-                                # Content after </think> - this is the actual response
-                                if in_thinking and thinking_buffer.strip():
-                                    yield {"type": "thinking", "content": thinking_buffer.strip()}
-                                thinking_buffer = ""
-                                in_thinking = False
-                                if part.strip():
-                                    yield {"type": "content", "content": part}
-                    elif "<think>" in content:
-                        # Start of thinking
-                        parts = content.split("<think>")
-                        for j, part in enumerate(parts):
-                            if j == 0:
-                                # Content before <think>
-                                if part.strip():
-                                    if in_thinking:
-                                        thinking_buffer += part
-                                    else:
-                                        yield {"type": "content", "content": part}
-                            elif part:
-                                # Content after <think> - this is thinking
-                                in_thinking = True
-                                thinking_buffer += part
-                    elif in_thinking:
-                        # Continue thinking
-                        thinking_buffer += content
-                    else:
-                        yield {"type": "content", "content": content}
-
-                # Check for tool calls
-                if delta.tool_calls:
-                    for tool_call in delta.tool_calls:
-                        try:
-                            index = tool_call.index
-                            if index not in tool_call_buffer:
-                                tool_call_buffer[index] = {
-                                    "id": "",
-                                    "name": "",
-                                    "arguments": ""
-                                }
-                            if tool_call.id:
-                                tool_call_buffer[index]["id"] = tool_call.id
-                            if tool_call.function and tool_call.function.name:
-                                tool_call_buffer[index]["name"] = tool_call.function.name
-                            if tool_call.function and tool_call.function.arguments:
-                                tool_call_buffer[index]["arguments"] += tool_call.function.arguments
-                        except Exception as e:
-                            print(f"[Debug] Error parsing tool_call: {e}, tool_call: {tool_call}")
-
-                # Check if this is the final chunk - yield any remaining tool calls or thinking
-                if finish_reason in ["tool_calls", "stop", "length"]:
-                    # Yield any remaining thinking content
-                    if thinking_buffer.strip():
-                        yield {"type": "thinking", "content": thinking_buffer.strip()}
-                        thinking_buffer = ""
-                    if tool_call_buffer:
-                        for index in sorted(tool_call_buffer.keys()):
-                            yield {"type": "tool_call", "tool_call": tool_call_buffer[index]}
-                        tool_call_buffer = {}
+            if supports_thinking and thinking_parser == "minimax_claude":
+                yield from self._stream_with_thinking(stream)
+            else:
+                yield from self._stream_simple(stream)
 
         except RateLimitError as e:
             print(f"[Rate limit exceeded. Please wait: {e}]")
@@ -240,6 +174,92 @@ class MiniMaxAIClient:
             print(f"[API error: {e}]")
             raise
 
+    def _stream_simple(self, stream) -> Iterator[Dict[str, Any]]:
+        """Simple streaming without thinking block parsing."""
+        for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield {"type": "content", "content": chunk.choices[0].delta.content}
+
+    def _stream_with_thinking(self, stream) -> Iterator[Dict[str, Any]]:
+        """Streaming with thinking block parsing for Claude-style models."""
+        thinking_buffer = ""
+        in_thinking = False
+        tool_call_buffer: Dict[int, Dict[str, Any]] = {}
+
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+
+            delta = chunk.choices[0].delta
+            finish_reason = chunk.choices[0].finish_reason
+
+            # Handle content delta
+            if delta.content:
+                content = delta.content
+                if "</think>" in content:
+                    # End of thinking
+                    parts = content.split("</think>")
+                    for j, part in enumerate(parts):
+                        if j == 0:
+                            if part:
+                                if in_thinking:
+                                    thinking_buffer += part
+                                else:
+                                    yield {"type": "content", "content": part}
+                        elif part:
+                            if in_thinking and thinking_buffer.strip():
+                                yield {"type": "thinking", "content": thinking_buffer.strip()}
+                            thinking_buffer = ""
+                            in_thinking = False
+                            if part.strip():
+                                yield {"type": "content", "content": part}
+                elif "<think>" in content:
+                    # Start of thinking
+                    parts = content.split("<think>")
+                    for j, part in enumerate(parts):
+                        if j == 0:
+                            if part.strip():
+                                if in_thinking:
+                                    thinking_buffer += part
+                                else:
+                                    yield {"type": "content", "content": part}
+                        elif part:
+                            in_thinking = True
+                            thinking_buffer += part
+                elif in_thinking:
+                    thinking_buffer += content
+                else:
+                    yield {"type": "content", "content": content}
+
+            # Handle tool calls
+            if delta.tool_calls:
+                for tool_call in delta.tool_calls:
+                    try:
+                        index = tool_call.index
+                        if index not in tool_call_buffer:
+                            tool_call_buffer[index] = {
+                                "id": "",
+                                "name": "",
+                                "arguments": ""
+                            }
+                        if tool_call.id:
+                            tool_call_buffer[index]["id"] = tool_call.id
+                        if tool_call.function and tool_call.function.name:
+                            tool_call_buffer[index]["name"] = tool_call.function.name
+                        if tool_call.function and tool_call.function.arguments:
+                            tool_call_buffer[index]["arguments"] += tool_call.function.arguments
+                    except Exception as e:
+                        print(f"[Debug] Error parsing tool_call: {e}, tool_call: {tool_call}")
+
+            # Yield remaining content at end
+            if finish_reason in ["tool_calls", "stop", "length"]:
+                if thinking_buffer.strip():
+                    yield {"type": "thinking", "content": thinking_buffer.strip()}
+                    thinking_buffer = ""
+                if tool_call_buffer:
+                    for index in sorted(tool_call_buffer.keys()):
+                        yield {"type": "tool_call", "tool_call": tool_call_buffer[index]}
+                    tool_call_buffer = {}
 
     def create_message_stream(
         self,
@@ -247,7 +267,7 @@ class MiniMaxAIClient:
         tools: Optional[List[Dict[str, Any]]] = None
     ) -> Iterator[str]:
         """
-        Create a streaming message.
+        Create a streaming message (simple text streaming).
 
         Args:
             messages: List of message dictionaries with 'role' and 'content'
@@ -258,14 +278,14 @@ class MiniMaxAIClient:
         """
         try:
             kwargs = {
-                "model": self.model,
+                "model": self.model_name,
                 "max_tokens": settings.MAX_TOKENS,
                 "messages": messages,
                 "temperature": settings.TEMPERATURE,
                 "stream": True
             }
 
-            if tools:
+            if tools and self.model_config.get("supports_tools", True):
                 kwargs["tools"] = convert_tools_to_openai_format(tools)
 
             stream = self.client.chat.completions.create(**kwargs)
@@ -355,7 +375,6 @@ class MiniMaxAIClient:
             all_results = []
 
             with DDGS() as ddgs:
-                # Search with real-time results
                 for result in ddgs.text(query, max_results=count):
                     all_results.append({
                         'title': result.get('title', ''),
@@ -366,7 +385,6 @@ class MiniMaxAIClient:
             if not all_results:
                 return "No search results found. Please try a different query."
 
-            # Format and return results
             formatted_results = []
             for i, result in enumerate(all_results[:count], 1):
                 formatted_results.append(
@@ -422,11 +440,7 @@ class MiniMaxAIClient:
         Returns:
             List of model names
         """
-        return [
-            settings.MODEL_NAME,
-            "MiniMax-Text-01",
-            "MiniMax-Embeddings-01",
-        ]
+        return ModelRegistry.list_all_models()
 
     def health_check(self) -> bool:
         """
@@ -437,7 +451,7 @@ class MiniMaxAIClient:
         """
         try:
             self.client.chat.completions.create(
-                model=self.model,
+                model=self.model_name,
                 max_tokens=10,
                 messages=[{"role": "user", "content": "Hi"}]
             )
@@ -446,5 +460,8 @@ class MiniMaxAIClient:
             return False
 
 
+# Backward compatibility alias
+MiniMaxAIClient = AIClient
+
 # Create default client instance
-default_client = MiniMaxAIClient()
+default_client = AIClient()

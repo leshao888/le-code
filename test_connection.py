@@ -8,45 +8,56 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from config.settings import settings
+from config.models import ModelRegistry
 
 # Check API Key
-api_key = settings.API_KEY or os.getenv("MINIMAX_API_KEY")
+api_key = settings.API_KEY
 if not api_key:
-    print("[ERROR] API_KEY not found. Please set it in config.json or via MINIMAX_API_KEY environment variable")
+    print("[ERROR] API_KEY not found. Please set it in config.json or via AI_API_KEY environment variable")
     sys.exit(1)
 
 print(f"[OK] API Key found: {api_key[:20]}...{api_key[-4:]}")
+
+# Check model configuration
+model_name = settings.MODEL
+model_config = ModelRegistry.get_model_config(model_name)
+if not model_config:
+    print(f"[ERROR] Model '{model_name}' not found.")
+    print(f"[INFO] Available models: {', '.join(ModelRegistry.list_all_models())}")
+    sys.exit(1)
+
+print(f"[OK] Model: {model_name}")
+print(f"[OK] Provider: {model_config.get('provider', 'unknown')}")
+print(f"[OK] Base URL: {model_config.get('base_url', '')}")
 
 # Test API connection
 print("\n[INFO] Testing API connection...")
 
 try:
-    import anthropic
+    from ai.client import AIClient
 
-    client = anthropic.Anthropic(
-        api_key=api_key,
-        base_url=settings.BASE_URL,
-        timeout=60.0,
-        max_retries=3
-    )
+    client = AIClient()
+
+    # Health check
+    if client.health_check():
+        print("[OK] API Connection Successful!")
+    else:
+        print("[ERROR] API health check failed")
+        sys.exit(1)
 
     # Test with a simple message
     print("[INFO] Sending test request...")
 
-    response = client.messages.create(
-        model=settings.MODEL_NAME,
-        max_tokens=100,
-        messages=[
-            {"role": "user", "content": "请用一句话回复：你好"}
-        ]
+    response = client.create_message(
+        messages=[{"role": "user", "content": "请用一句话回复：你好"}],
+        stream=False
     )
 
     # Display response
-    if response.content and len(response.content) > 0:
-        assistant_message = response.content[0].text
+    if response.get("content"):
         print(f"\n[OK] API Connection Successful!")
-        print(f"[AI] Response: {assistant_message}")
-        print(f"[USAGE] {response.usage.input_tokens} input tokens, {response.usage.output_tokens} output tokens")
+        print(f"[AI] Response: {response['content']}")
+        print(f"[USAGE] {response.get('usage', {}).get('input_tokens', 0)} input tokens, {response.get('usage', {}).get('output_tokens', 0)} output tokens")
     else:
         print("[WARNING] API connected but no response content")
 
@@ -54,14 +65,6 @@ try:
     print("\n[INFO] To start the interactive program, run:")
     print("   python main.py")
     print("\n   Or double-click run.bat")
-
-except anthropic.APIError as e:
-    print(f"\n[ERROR] API Error: {e}")
-    print("\n[SOLUTION] Possible solutions:")
-    print("   1. Check if your API Key is correct")
-    print("   2. Check if you have sufficient quota")
-    print("   3. Check your internet connection")
-    sys.exit(1)
 
 except Exception as e:
     print(f"\n[ERROR] Unexpected error: {e}")

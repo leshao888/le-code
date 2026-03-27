@@ -6,13 +6,14 @@
 
 ## 特性
 
-- 🚀 **多模型支持**: 通过配置文件轻松切换不同模型（MiniMax、OpenAI 兼容接口等）
+- 🚀 **多模型支持**: 通过配置文件轻松切换不同模型（MiniMax、Kimi、OpenAI 兼容接口等）
 - 📁 **文件操作**: 支持读取、写入、搜索和编辑代码文件
 - 💻 **命令执行**: 在终端中执行 shell 命令并获取输出
 - 🔍 **网络搜索**: 内置 DuckDuckGo 搜索，获取实时信息
 - 💾 **对话记忆**: 自动保存对话历史，支持多会话管理
 - 🎨 **美观界面**: 使用 Rich 库提供彩色高亮和 Markdown 渲染
 - ⚙️ **灵活配置**: 支持配置文件和环境变量两种配置方式
+- 🔌 **可插拔架构**: 通过 `models.json` 可轻松添加自定义模型
 
 ## 安装
 
@@ -49,16 +50,15 @@ cp config/config.example.json config/config.json
 ```json
 {
     "api_key": "your-api-key-here",
-    "base_url": "https://api.minimax.chat/v1",
-    "model_name": "MiniMax-Text-01",
+    "model": "MiniMax-M2.7",
     "max_tokens": 8192,
-    "temperature": 0.6
+    "temperature": 1.0
 }
 ```
 
 ### 获取 API Key
 
-1. 访问 [MiniMax 开放平台](https://www.minimax.chat/) 或你的 AI 模型提供商
+1. 访问 [MiniMax 开放平台](https://www.minimax.chat/)、[Moonshot](https://www.moonshot.cn/) 或你的 AI 模型提供商
 2. 注册并登录账户
 3. 在 API Keys 页面创建 API Key
 
@@ -67,9 +67,10 @@ cp config/config.example.json config/config.json
 你也可以使用环境变量配置，优先级高于配置文件：
 
 ```bash
-export MINIMAX_API_KEY="your-api-key"
-export MINIMAX_BASE_URL="https://api.minimax.chat/v1"
-export MINIMAX_MODEL_NAME="MiniMax-Text-01"
+export AI_API_KEY="your-api-key"
+export AI_MODEL="MiniMax-M2.7"
+export AI_MAX_TOKENS="8192"
+export AI_TEMPERATURE="1.0"
 ```
 
 ## 使用
@@ -156,10 +157,9 @@ run.bat
 ```json
 {
     "api_key": "your-api-key",
-    "base_url": "https://api.minimax.chat/v1",
-    "model_name": "MiniMax-Text-01",
+    "model": "MiniMax-M2.7",
     "max_tokens": 8192,
-    "temperature": 0.6
+    "temperature": 1.0
 }
 ```
 
@@ -167,27 +167,85 @@ run.bat
 
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
-| `MINIMAX_API_KEY` | API Key | 必填 |
-| `MINIMAX_BASE_URL` | API Base URL | `https://api.minimax.chat/v1` |
-| `MINIMAX_MODEL_NAME` | 模型名称 | `MiniMax-Text-01` |
-| `MINIMAX_MAX_TOKENS` | 最大 token 数 | `8192` |
-| `MINIMAX_TEMPERATURE` | 温度参数 (0-1) | `0.6` |
+| `AI_API_KEY` | API Key | 必填 |
+| `AI_MODEL` | 模型名称 | `MiniMax-M2.7` |
+| `AI_MAX_TOKENS` | 最大 token 数 | `8192` |
+| `AI_TEMPERATURE` | 温度参数 (0-1) | `0.6` |
 | `LE_CODE_SHELL_TIMEOUT` | 命令超时时间(秒) | `30` |
 | `LE_CODE_MAX_OUTPUT_LENGTH` | 最大输出长度 | `10000` |
 
 ### 切换模型
 
-只需修改 `config/config.json` 中的配置即可切换模型：
+#### 方式一：修改 config.json
+
+修改 `config/config.json` 中的 `model` 字段：
 
 ```json
 {
-    "api_key": "your-new-api-key",
-    "base_url": "https://api.new-provider.com/v1",
-    "model_name": "new-model-name",
+    "api_key": "your-api-key",
+    "model": "kimi-k2.5",
     "max_tokens": 8192,
-    "temperature": 0.6
+    "temperature": 1.0
 }
 ```
+
+#### 方式二：添加自定义模型
+
+1. 在 `config/models.json` 中添加模型配置：
+
+```json
+{
+    "my-custom-model": {
+        "provider": "myprovider",
+        "base_url": "https://api.myprovider.com/v1",
+        "api_type": "openai",
+        "supports_thinking": true,
+        "thinking_parser": "minimax_claude",
+        "supports_tools": true,
+        "supports_streaming": true,
+        "context_window": 128000,
+        "description": "My Custom Model"
+    }
+}
+```
+
+2. 在 `config/config.json` 中切换到新模型：
+
+```json
+{
+    "api_key": "your-api-key",
+    "model": "my-custom-model",
+    ...
+}
+```
+
+### 模型配置项说明
+
+| 字段 | 说明 | 可选值 |
+|------|------|--------|
+| `provider` | 提供商名称 | `minimax`, `moonshot`, `openai`, `deepseek`, `zhipu`, `qwen` 等 |
+| `base_url` | API 端点 | 如 `https://api.moonshot.cn/v1` |
+| `api_type` | API 类型 | `openai` 或 `anthropic` |
+| `supports_thinking` | 是否支持思考过程 | `true` / `false` |
+| `thinking_parser` | 思考过程解析器 | `minimax_claude`（支持思考）或 `no_thinking` |
+| `supports_tools` | 是否支持工具调用 | `true` / `false` |
+| `supports_streaming` | 是否支持流式输出 | `true` / `false` |
+| `context_window` | 上下文窗口大小 | 整数，如 `128000` |
+| `description` | 模型描述 | 字符串 |
+
+### 内置支持模型
+
+| 模型 | Provider | 支持思考 |
+|------|----------|----------|
+| MiniMax-M2.7 | minimax | ✅ |
+| MiniMax-Text-01 | minimax | ✅ |
+| glm-4.7 | zhipu | ✅ |
+| glm-4 | zhipu | ✅ |
+| gpt-4o | openai | ❌ |
+| gpt-4o-mini | openai | ❌ |
+| qwen-plus | qwen | ✅ |
+| deepseek-chat | deepseek | ❌ |
+| kimi-k2.5 | moonshot | ✅ |
 
 ## 项目结构
 
@@ -199,9 +257,9 @@ le-code/
 │   ├── input_handler.py   # 用户输入处理
 │   └── output_formatter.py # 输出格式化
 ├── ai/
-│   ├── client.py          # AI 客户端 (OpenAI SDK 兼容)
+│   ├── client.py          # AI 客户端 (支持多模型)
 │   ├── tools.py           # 工具函数定义
-│   └── error_handler.py   # 错误处理
+│   └── thinking.py        # 思考过程解析
 ├── tools/
 │   ├── file_ops.py        # 文件操作工具
 │   ├── shell.py           # Shell 命令执行
@@ -210,7 +268,9 @@ le-code/
 │   └── memory_manager.py  # 对话记忆管理
 ├── config/
 │   ├── settings.py        # 配置管理
-│   ├── config.json        # 用户配置 (不提交)
+│   ├── models.py         # 模型注册表
+│   ├── models.json       # 用户自定义模型配置
+│   ├── config.json       # 用户配置 (不提交)
 │   └── config.example.json # 配置示例
 ├── requirements.txt
 ├── .env.example
@@ -227,15 +287,19 @@ le-code/
 
 ### Q: 如何获取 API Key？
 
-A: 访问你的 AI 模型提供商开放平台（如 MiniMax、OpenAI 等），注册账户后在 API Keys 页面创建。
+A: 访问你的 AI 模型提供商开放平台（如 MiniMax、Moonshot、OpenAI 等），注册账户后在 API Keys 页面创建。
 
 ### Q: 如何切换不同的模型？
 
-A: 修改 `config/config.json` 文件中的 `model_name` 和 `base_url` 配置即可。
+A: 修改 `config/config.json` 文件中的 `model` 配置即可切换模型。预置模型包括 MiniMax、Kimi、GLM、GPT、Qwen、DeepSeek 等。
 
 ### Q: 支持哪些模型？
 
-A: 支持所有 OpenAI SDK 兼容的模型，包括 MiniMax、GLM、OpenAI 等。只需配置相应的 base_url 和 model_name。
+A: 支持所有 OpenAI SDK 兼容的模型，包括 MiniMax、Moonshot (Kimi)、GLM、OpenAI、Qwen、DeepSeek 等。只需配置相应的 base_url 和 model。
+
+### Q: 如何添加自定义模型？
+
+A: 在 `config/models.json` 中添加新模型配置，参考上文的"添加自定义模型"部分。
 
 ### Q: 对话历史保存在哪里？
 
@@ -249,12 +313,16 @@ A: 使用 `/clear` 命令清除当前会话的历史。
 
 A: 环境变量优先级更高，会覆盖配置文件中的值。
 
+### Q: Kimi K2.5 的 temperature 必须是多少？
+
+A: Kimi K2.5 只支持 `temperature=1.0`，需要在配置文件中设置。
+
 ## 故障排除
 
 ### 连接 API 失败
 
 1. 检查 API Key 是否正确
-2. 确认 base_url 是否正确
+2. 确认模型名称是否正确
 3. 确认网络连接正常
 4. 检查 API Key 是否有足够的额度
 
@@ -278,15 +346,22 @@ pip install -r requirements.txt
 cp config/config.example.json config/config.json
 # 编辑 config/config.json
 
+# 测试连接
+python test_connection.py
+
 # 运行
 python main.py
 ```
 
-### 添加新工具
+### 测试不同模型
 
-1. 在 `ai/tools.py` 中定义新工具
-2. 在 `tools/` 中实现工具逻辑
-3. 在 `main.py` 的 `_execute_tool` 方法中添加处理逻辑
+```bash
+# 测试 MiniMax
+python -c "from ai.client import AIClient; c = AIClient('MiniMax-M2.7'); print(c.health_check())"
+
+# 测试 Kimi
+python -c "from ai.client import AIClient; c = AIClient('kimi-k2.5'); print(c.health_check())"
+```
 
 ## 许可证
 
@@ -297,33 +372,4 @@ MIT License
 ### 开发工具
 
 - **开发过程**: 全程使用 Claude Code + MiniMax 2.7 模型驱动开发
-- **SDK**: 使用 OpenAI Python SDK（MiniMax OpenAI 兼容接口）
-- **接口**: OpenAI `chat.completions.create` 兼容接口
-- **工具调用**: 支持 Function Calling / Tool Use
-- **思考过程**: 支持 `<think>`/`</think>` 标签解析（MiniMax/Claude 风格）
-
-### 已测试模型
-
-- ✅ **MiniMax 系列**: `MiniMax-Text-01`、`MiniMax-M2.7` 等（通过 OpenAI 兼容接口）
-- ✅ **智谱 GLM 系列**: `glm-4` 等（通过 OpenAI 兼容接口）
-- 🔄 **其他 OpenAI 兼容模型**: 理论上支持，详情见下方限制
-
-### 当前限制
-
-1. **思考过程标签**: 代码中针对 `<think>`/`</think>` 格式进行了解析，这是 MiniMax 和 Claude 等模型的格式。如果切换到不支持此格式的模型，思考过程可能无法正常显示。
-
-2. **模型列表**: `get_available_models()` 目前硬编码了 MiniMax 模型列表，后续会改为动态获取。
-
-3. **工具支持**: 工具调用（Function Calling）功能需要模型支持，OpenAI 原生接口模型均可使用。
-
-### 后续计划
-
-- [ ] 支持更多 OpenAI 兼容模型（Qwen、Yi、DeepSeek 等）
-- [ ] 动态获取可用模型列表
-- [ ] 适配不同模型的思考过程标签格式
-- [ ] 添加更多工具和功能
-- [ ] 支持 Claude API 原生接口（用于不支持 OpenAI 兼容接口的场景）
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
+- **模型架构**: 重构为可插拔的 `ModelRegistry` 架构，支持通过配置文件添加自定义模型

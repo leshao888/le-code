@@ -15,7 +15,7 @@ from typing import Optional, Dict, Any, List, Iterator
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config.settings import settings
-from ai.client import MiniMaxAIClient
+from ai.client import AIClient
 from ai.tools import ALL_TOOLS
 from cli.ui import TerminalUI, default_ui
 from cli.input_handler import default_input_handler
@@ -35,7 +35,7 @@ class LeCodeApp:
             sys.exit(1)
 
         self.ui = default_ui
-        self.ai_client = MiniMaxAIClient()
+        self.ai_client = AIClient()
         self.memory = ConversationMemory()
         self.session_manager = SessionManager()
 
