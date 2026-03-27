@@ -1,5 +1,7 @@
 # le-code - Terminal AI Programming Assistant
 
+> **全程使用 Claude Code + MiniMax 2.7 模型开发实现**
+
 一个类似 Claude Code 的终端 AI 编程工具，支持配置不同模型和 API，帮助你回答编程问题、生成和修改代码。
 
 ## 特性
@@ -292,18 +294,19 @@ MIT License
 
 ## 当前实现状态
 
+### 开发工具
+
+- **开发过程**: 全程使用 Claude Code + MiniMax 2.7 模型驱动开发
+- **SDK**: 使用 OpenAI Python SDK（MiniMax OpenAI 兼容接口）
+- **接口**: OpenAI `chat.completions.create` 兼容接口
+- **工具调用**: 支持 Function Calling / Tool Use
+- **思考过程**: 支持 `<think>`/`</think>` 标签解析（MiniMax/Claude 风格）
+
 ### 已测试模型
 
 - ✅ **MiniMax 系列**: `MiniMax-Text-01`、`MiniMax-M2.7` 等（通过 OpenAI 兼容接口）
 - ✅ **智谱 GLM 系列**: `glm-4` 等（通过 OpenAI 兼容接口）
 - 🔄 **其他 OpenAI 兼容模型**: 理论上支持，详情见下方限制
-
-### 技术实现
-
-- **SDK**: 使用 OpenAI Python SDK
-- **接口**: OpenAI `chat.completions.create` 兼容接口
-- **工具调用**: 支持 Function Calling / Tool Use
-- **思考过程**: 支持 `<think>`/`</think>` 标签解析（MiniMax/Claude 风格）
 
 ### 当前限制
 
