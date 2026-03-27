@@ -250,7 +250,7 @@ class TerminalUI:
         elif self.input_handler.is_model_command(command):
             self.display_status({
                 "Model": settings.MODEL_NAME,
-                "Base URL": settings.ZHIPUAI_BASE_URL,
+                "Base URL": settings.BASE_URL,
                 "Max Tokens": settings.MAX_TOKENS,
                 "Temperature": settings.TEMPERATURE,
             })

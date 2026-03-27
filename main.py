@@ -172,14 +172,17 @@ class LeCodeApp:
                 elif event_type == "tool_call":
                     tool_call = event.get("tool_call", {})
                     tool_calls.append(tool_call)
+                    print(f"[Debug] Received tool_call: {tool_call}")
 
             # Complete streaming
             self.ui.end_streaming()
 
             # Handle tool calls if any
             if tool_calls:
-                self.ui.display_info("\n[Executing tools...]")
+                print(f"[Debug] Processing {len(tool_calls)} tool calls")
+                self.ui.display_info(f"\n[Executing {len(tool_calls)} tool(s)...]")
                 for tool_call in tool_calls:
+                    print(f"[Debug] Executing tool_call: {tool_call}")
                     tool_name = tool_call.get("name")
                     # Parse arguments from JSON string
                     try:
@@ -363,18 +366,27 @@ class LeCodeApp:
             except:
                 arguments = {}
 
-            # Add tool result as plain text message (more compatible)
+            tool_call_id = tool_call.get("id", "")
+
+            # Add tool result using OpenAI tool_result format
             messages.append({
                 "role": "user",
-                "content": f"以下是搜索结果，请基于这些信息回答用户的问题：\n\n{tool_result}"
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": tool_call_id,
+                        "content": tool_result
+                    }
+                ]
             })
 
             # Display waiting indicator
             self.ui.display_waiting_animation()
 
-            # Get follow-up response without tools to prevent further tool calls
+            # Get follow-up response (with tools to handle potential follow-up tool calls)
             response = self.ai_client.create_message(
                 messages=messages,
+                tools=ALL_TOOLS,
                 stream=True
             )
 

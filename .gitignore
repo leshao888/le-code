@@ -43,6 +43,9 @@ env/
 .le-code-backups/
 *.log
 *.bak
+*.bak
+START_HERE.txt
+config/config.json
 
 # OS
 .DS_Store

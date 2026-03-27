@@ -1,15 +1,16 @@
 # le-code - Terminal AI Programming Assistant
 
-一个类似 Claude Code 的终端 AI 编程工具，使用智谱 AI 的 GLM-4.7 模型帮助你回答编程问题、生成和修改代码。
+一个类似 Claude Code 的终端 AI 编程工具，支持配置不同模型和 API，帮助你回答编程问题、生成和修改代码。
 
 ## 特性
 
-- 🚀 **智能代码生成**: 使用 GLM-4.7 高智能模型进行代码生成和修改
+- 🚀 **多模型支持**: 通过配置文件轻松切换不同模型（MiniMax、OpenAI 兼容接口等）
 - 📁 **文件操作**: 支持读取、写入、搜索和编辑代码文件
 - 💻 **命令执行**: 在终端中执行 shell 命令并获取输出
+- 🔍 **网络搜索**: 内置 DuckDuckGo 搜索，获取实时信息
 - 💾 **对话记忆**: 自动保存对话历史，支持多会话管理
 - 🎨 **美观界面**: 使用 Rich 库提供彩色高亮和 Markdown 渲染
-- 💰 **成本优化**: 支持智谱 AI Coding Plan，享受优惠套餐
+- ⚙️ **灵活配置**: 支持配置文件和环境变量两种配置方式
 
 ## 安装
 
@@ -34,23 +35,40 @@ pip install -r requirements.txt
 
 3. 配置 API Key
 
-创建 `.env` 文件或设置环境变量：
-
 ```bash
-# 方式 1: 创建 .env 文件
-cp .env.example .env
-# 编辑 .env 文件，填入你的 API Key
+# 复制配置示例文件
+cp config/config.example.json config/config.json
 
-# 方式 2: 设置环境变量
-export ZHIPUAI_API_KEY="your-api-key-here"
+# 编辑 config/config.json，填入你的 API Key 和模型信息
+```
+
+**配置文件示例：**
+
+```json
+{
+    "api_key": "your-api-key-here",
+    "base_url": "https://api.minimax.chat/v1",
+    "model_name": "MiniMax-Text-01",
+    "max_tokens": 8192,
+    "temperature": 0.6
+}
 ```
 
 ### 获取 API Key
 
-1. 访问 [智谱 AI 开放平台](https://bigmodel.cn/)
+1. 访问 [MiniMax 开放平台](https://www.minimax.chat/) 或你的 AI 模型提供商
 2. 注册并登录账户
 3. 在 API Keys 页面创建 API Key
-4. （推荐）订阅 [GLM Coding Plan](https://bigmodel.cn/glm-coding) 享受优惠套餐
+
+### 环境变量配置（可选）
+
+你也可以使用环境变量配置，优先级高于配置文件：
+
+```bash
+export MINIMAX_API_KEY="your-api-key"
+export MINIMAX_BASE_URL="https://api.minimax.chat/v1"
+export MINIMAX_MODEL_NAME="MiniMax-Text-01"
+```
 
 ## 使用
 
@@ -58,6 +76,16 @@ export ZHIPUAI_API_KEY="your-api-key-here"
 
 ```bash
 python main.py
+```
+
+或使用快捷脚本：
+
+```bash
+# Windows
+run.bat
+
+# Linux/Mac
+./run.sh
 ```
 
 ### 基本命令
@@ -113,45 +141,51 @@ python main.py
 > 在所有 Python 文件中搜索 "def" 关键字
 ```
 
-## Coding Plan 配置
+#### 7. 网络搜索
 
-### 什么是 Coding Plan？
-
-GLM Coding Plan 是智谱 AI 专为 AI 编程打造的订阅套餐，提供高额用量和优惠价格。
-
-### 套餐对比
-
-| 套餐 | 价格 | 每 5 小时限额 | 每周限额 |
-|------|------|---------------|-----------|
-| Lite | ¥49/月 | 约 80 次 prompts | 约 400 次 |
-| Pro | ¥149/月 | 约 400 次 prompts | 约 2000 次 |
-| Max | ¥299/月 | 约 1600 次 prompts | 约 8000 次 |
-
-### 配置方式
-
-1. 订阅 Coding Plan 套餐
-2. 使用相同的 API Key
-3. 工具会自动使用 Coding Plan base URL
-
-### 优势
-
-- 相当于月订阅费用的 15-30 倍额度
-- 55+ Tokens/秒的生成速度
-- 稳定无忧，无封号风险
-- 支持图像视频理解、联网搜索等功能
+```
+> 搜索一下最新的 Python Web 框架
+```
 
 ## 配置选项
 
-可以通过环境变量自定义配置：
+### 配置文件 (config/config.json)
+
+```json
+{
+    "api_key": "your-api-key",
+    "base_url": "https://api.minimax.chat/v1",
+    "model_name": "MiniMax-Text-01",
+    "max_tokens": 8192,
+    "temperature": 0.6
+}
+```
+
+### 环境变量
 
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
-| `ZHIPUAI_API_KEY` | 智谱 AI API Key | 必填 |
-| `LE_CODE_MODEL` | 使用的模型 | `glm-4.7` |
-| `LE_CODE_MAX_TOKENS` | 最大 token 数 | `8192` |
-| `LE_CODE_TEMPERATURE` | 温度参数 (0-1) | `0.6` |
+| `MINIMAX_API_KEY` | API Key | 必填 |
+| `MINIMAX_BASE_URL` | API Base URL | `https://api.minimax.chat/v1` |
+| `MINIMAX_MODEL_NAME` | 模型名称 | `MiniMax-Text-01` |
+| `MINIMAX_MAX_TOKENS` | 最大 token 数 | `8192` |
+| `MINIMAX_TEMPERATURE` | 温度参数 (0-1) | `0.6` |
 | `LE_CODE_SHELL_TIMEOUT` | 命令超时时间(秒) | `30` |
 | `LE_CODE_MAX_OUTPUT_LENGTH` | 最大输出长度 | `10000` |
+
+### 切换模型
+
+只需修改 `config/config.json` 中的配置即可切换模型：
+
+```json
+{
+    "api_key": "your-new-api-key",
+    "base_url": "https://api.new-provider.com/v1",
+    "model_name": "new-model-name",
+    "max_tokens": 8192,
+    "temperature": 0.6
+}
+```
 
 ## 项目结构
 
@@ -163,7 +197,7 @@ le-code/
 │   ├── input_handler.py   # 用户输入处理
 │   └── output_formatter.py # 输出格式化
 ├── ai/
-│   ├── client.py          # 智谱 AI 客户端
+│   ├── client.py          # AI 客户端 (OpenAI SDK 兼容)
 │   ├── tools.py           # 工具函数定义
 │   └── error_handler.py   # 错误处理
 ├── tools/
@@ -173,7 +207,9 @@ le-code/
 ├── memory/
 │   └── memory_manager.py  # 对话记忆管理
 ├── config/
-│   └── settings.py        # 配置管理
+│   ├── settings.py        # 配置管理
+│   ├── config.json        # 用户配置 (不提交)
+│   └── config.example.json # 配置示例
 ├── requirements.txt
 ├── .env.example
 └── README.md
@@ -181,7 +217,7 @@ le-code/
 
 ## 安全说明
 
-- **API Key 安全**: 请勿将 API Key 提交到代码仓库
+- **API Key 安全**: 请勿将 `config/config.json` 或 `.env` 提交到代码仓库（已加入 .gitignore）
 - **命令执行**: 工具会自动过滤危险命令
 - **文件操作**: 仅允许访问当前工作目录及其子目录
 
@@ -189,19 +225,15 @@ le-code/
 
 ### Q: 如何获取 API Key？
 
-A: 访问 [智谱 AI 开放平台](https://bigmodel.cn/) 注册账户后在 API Keys 页面创建。
+A: 访问你的 AI 模型提供商开放平台（如 MiniMax、OpenAI 等），注册账户后在 API Keys 页面创建。
 
-### Q: 为什么建议使用 Coding Plan？
+### Q: 如何切换不同的模型？
 
-A: Coding Plan 提供大幅优惠，相当于月费用的 15-30 倍额度，适合高频使用。
+A: 修改 `config/config.json` 文件中的 `model_name` 和 `base_url` 配置即可。
 
 ### Q: 支持哪些模型？
 
-A: 支持 GLM-4.7、GLM-4.6、GLM-4.5、GLM-4.5-Air 等模型。
-
-### Q: 如何查看使用量？
-
-A: 登录智谱 AI 开放平台，在用量统计页面查看套餐使用情况。
+A: 支持所有 OpenAI SDK 兼容的模型，包括 MiniMax、GLM、OpenAI 等。只需配置相应的 base_url 和 model_name。
 
 ### Q: 对话历史保存在哪里？
 
@@ -211,13 +243,18 @@ A: 保存在 `~/.claude/memory/le-code/` 目录下。
 
 A: 使用 `/clear` 命令清除当前会话的历史。
 
+### Q: 环境变量和配置文件哪个优先？
+
+A: 环境变量优先级更高，会覆盖配置文件中的值。
+
 ## 故障排除
 
 ### 连接 API 失败
 
 1. 检查 API Key 是否正确
-2. 确认网络连接正常
-3. 检查 API Key 是否有足够的额度
+2. 确认 base_url 是否正确
+3. 确认网络连接正常
+4. 检查 API Key 是否有足够的额度
 
 ### 命令执行超时
 
@@ -236,7 +273,8 @@ A: 使用 `/clear` 命令清除当前会话的历史。
 pip install -r requirements.txt
 
 # 配置 API Key
-export ZHIPUAI_API_KEY="your-dev-api-key"
+cp config/config.example.json config/config.json
+# 编辑 config/config.json
 
 # 运行
 python main.py
@@ -248,21 +286,41 @@ python main.py
 2. 在 `tools/` 中实现工具逻辑
 3. 在 `main.py` 的 `_execute_tool` 方法中添加处理逻辑
 
-## 参考资料
-
-- [智谱 AI 官方文档](https://docs.bigmodel.cn/cn/api/introduction)
-- [GLM Coding Plan 套餐](https://docs.bigmodel.cn/cn/coding-plan/overview)
-- [Claude API 兼容接口](https://docs.bigmodel.cn/cn/guide/develop/claude/introduction)
-- [Anthropic Python SDK](https://docs.anthropic.com/en/api/python)
-
 ## 许可证
 
 MIT License
 
+## 当前实现状态
+
+### 已测试模型
+
+- ✅ **MiniMax 系列**: `MiniMax-Text-01`、`MiniMax-M2.7` 等（通过 OpenAI 兼容接口）
+- ✅ **智谱 GLM 系列**: `glm-4` 等（通过 OpenAI 兼容接口）
+- 🔄 **其他 OpenAI 兼容模型**: 理论上支持，详情见下方限制
+
+### 技术实现
+
+- **SDK**: 使用 OpenAI Python SDK
+- **接口**: OpenAI `chat.completions.create` 兼容接口
+- **工具调用**: 支持 Function Calling / Tool Use
+- **思考过程**: 支持 `<think>`/`</think>` 标签解析（MiniMax/Claude 风格）
+
+### 当前限制
+
+1. **思考过程标签**: 代码中针对 `<think>`/`</think>` 格式进行了解析，这是 MiniMax 和 Claude 等模型的格式。如果切换到不支持此格式的模型，思考过程可能无法正常显示。
+
+2. **模型列表**: `get_available_models()` 目前硬编码了 MiniMax 模型列表，后续会改为动态获取。
+
+3. **工具支持**: 工具调用（Function Calling）功能需要模型支持，OpenAI 原生接口模型均可使用。
+
+### 后续计划
+
+- [ ] 支持更多 OpenAI 兼容模型（Qwen、Yi、DeepSeek 等）
+- [ ] 动态获取可用模型列表
+- [ ] 适配不同模型的思考过程标签格式
+- [ ] 添加更多工具和功能
+- [ ] 支持 Claude API 原生接口（用于不支持 OpenAI 兼容接口的场景）
+
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request！
-
----
-
-**Powered by ZhipuAI GLM-4.7**

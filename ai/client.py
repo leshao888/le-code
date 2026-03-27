@@ -39,8 +39,8 @@ class MiniMaxAIClient:
     def __init__(self):
         """Initialize the MiniMax client."""
         self.client = OpenAI(
-            api_key=settings.ZHIPUAI_API_KEY,
-            base_url=settings.ZHIPUAI_BASE_URL,
+            api_key=settings.API_KEY,
+            base_url=settings.BASE_URL,
             timeout=60.0,
             max_retries=3
         )
@@ -202,19 +202,22 @@ class MiniMaxAIClient:
                 # Check for tool calls
                 if delta.tool_calls:
                     for tool_call in delta.tool_calls:
-                        index = tool_call.index
-                        if index not in tool_call_buffer:
-                            tool_call_buffer[index] = {
-                                "id": "",
-                                "name": "",
-                                "arguments": ""
-                            }
-                        if tool_call.id:
-                            tool_call_buffer[index]["id"] = tool_call.id
-                        if tool_call.function and tool_call.function.name:
-                            tool_call_buffer[index]["name"] = tool_call.function.name
-                        if tool_call.function and tool_call.function.arguments:
-                            tool_call_buffer[index]["arguments"] += tool_call.function.arguments
+                        try:
+                            index = tool_call.index
+                            if index not in tool_call_buffer:
+                                tool_call_buffer[index] = {
+                                    "id": "",
+                                    "name": "",
+                                    "arguments": ""
+                                }
+                            if tool_call.id:
+                                tool_call_buffer[index]["id"] = tool_call.id
+                            if tool_call.function and tool_call.function.name:
+                                tool_call_buffer[index]["name"] = tool_call.function.name
+                            if tool_call.function and tool_call.function.arguments:
+                                tool_call_buffer[index]["arguments"] += tool_call.function.arguments
+                        except Exception as e:
+                            print(f"[Debug] Error parsing tool_call: {e}, tool_call: {tool_call}")
 
                 # Check if this is the final chunk - yield any remaining tool calls or thinking
                 if finish_reason in ["tool_calls", "stop", "length"]:

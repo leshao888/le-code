@@ -10,9 +10,9 @@ load_dotenv()
 from config.settings import settings
 
 # Check API Key
-api_key = os.getenv("ZHIPUAI_API_KEY")
+api_key = settings.API_KEY or os.getenv("MINIMAX_API_KEY")
 if not api_key:
-    print("[ERROR] ZHIPUAI_API_KEY not found in .env file")
+    print("[ERROR] API_KEY not found. Please set it in config.json or via MINIMAX_API_KEY environment variable")
     sys.exit(1)
 
 print(f"[OK] API Key found: {api_key[:20]}...{api_key[-4:]}")
@@ -25,13 +25,13 @@ try:
 
     client = anthropic.Anthropic(
         api_key=api_key,
-        base_url="https://open.bigmodel.cn/api/anthropic",
+        base_url=settings.BASE_URL,
         timeout=60.0,
         max_retries=3
     )
 
     # Test with a simple message
-    print("[INFO] Sending test request to ZhipuAI...")
+    print("[INFO] Sending test request...")
 
     response = client.messages.create(
         model=settings.MODEL_NAME,

@@ -330,7 +330,7 @@ class OutputFormatter:
 [bold cyan]║                                      ║[/bold cyan]
 [bold cyan]║   [bold white]le-code - Terminal AI Assistant[/bold white]   ║[/bold cyan]
 [bold cyan]║                                      ║[/bold cyan]
-[bold cyan]║   [dim]Powered by MiniMax-M2.7[/dim]         ║[/bold cyan]
+[bold cyan]║   [dim]Powered by {settings.MODEL_NAME}[/dim]         ║[/bold cyan]
 [bold cyan]║                                      ║[/bold cyan]
 [bold cyan]╚════════════════════════════════════════╝[/bold cyan]
 
